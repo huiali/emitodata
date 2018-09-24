@@ -4,8 +4,8 @@ using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Threading.Tasks;
-using Huiali.ILOData.Codes;
 using Huiali.ILOData.Extensions;
+using Huiali.ILOData.ILEmit;
 using Huiali.ILOData.Models;
 using Microsoft.AspNet.OData.Builder;
 using Microsoft.AspNet.OData.Extensions;
@@ -58,19 +58,23 @@ namespace Huiali.ILOData
                 {
                     var connectionString = Connection.Value;
                     var tables = DbSchemaReader.GetSchemata(connectionString);
+                    List<Type> modelTypes=new List<Type>();
                     foreach (var table in tables)
                     {
-                        var tableType = modelBuilder.CreateModelType($"Huiali.ILOData.ILEmit.{Connection.Key}.Models", table);
+                        var modelType = modelBuilder.CreateModelType($"{assemblyName}.{Connection.Key}.Models", table);
+                        modelTypes.Add(modelType);
                         //builder.EntitySet<>()
-                        var entityType = builder.AddEntityType(tableType);
+                        var entityType = builder.AddEntityType(modelType);
                         builder.AddEntitySet(table.Name, entityType);
                     }
 
+                    var dbcontextType = modelBuilder.CreateDbContext($"{assemblyName}.{Connection.Key}.Models.{Connection.Key}Context", modelTypes, connectionString);
                     routeBuilder.MapODataServiceRoute(
                         $"ODATAROUTE_{Connection.Key}",
                         Connection.Key,
                         builder.GetEdmModel());
                 }
+
                 routeBuilder
                     .Count()
                     .Filter()
