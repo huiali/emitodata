@@ -7,7 +7,7 @@ namespace Huiali.ILOData.Models
         public string SchemaName{set;get;}
         public string TableName{set;get;}
         public string ColumnName { set; get; }
-        public string ColumnType { set; get; }
+        public Type ColumnType { set; get; }
         public bool IsPrimaryKey { set; get; }
         public bool IsNullable { set; get; }
         public bool IsIdentity { set; get; }

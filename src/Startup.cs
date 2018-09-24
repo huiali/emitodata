@@ -1,7 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
+using System.Reflection.Emit;
 using System.Threading.Tasks;
+using Huiali.ILOData.Codes;
 using Huiali.ILOData.Extensions;
 using Huiali.ILOData.Models;
 using Microsoft.AspNet.OData.Builder;
@@ -11,6 +14,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.HttpsPolicy;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -20,41 +24,51 @@ namespace Huiali.ILOData
 {
     public class Startup
     {
+        public IConfiguration Configuration { get; }
+        private IEnumerable<IConfigurationSection> Connections;
         public Startup(IConfiguration configuration)
         {
             Configuration = configuration;
+            this.Connections = this.Configuration.GetSection("ConnectionStrings").GetChildren();
         }
-
-        public IConfiguration Configuration { get; }
-
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
             services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_2_1);
             services.AddOData();
 
-            var connectionSetion = Configuration.GetSection("ConnectionStrings");
+            foreach (var item in this.Connections)
+            {
+                //services.AddDbContext<>(options => options.UseSqlServer(item.Value))
+            }
         }
-
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
         public void Configure(IApplicationBuilder app, IHostingEnvironment env)
         {
             ODataConventionModelBuilder builder = new ODataConventionModelBuilder(app.ApplicationServices);
 
-            var connections = this.Configuration.GetSection("ConnectionStrings").GetChildren();
+            var assemblyName = "Huiali.ILOData.ILEmit";
+            var modelName = new AssemblyName(assemblyName);
+            var dynamicModelAssembly = AssemblyBuilder.DefineDynamicAssembly(modelName, AssemblyBuilderAccess.RunAndCollect);
+            var modelBuilder = dynamicModelAssembly.DefineDynamicModule(modelName.Name);
+
             Action<IRouteBuilder> configureRoutes = routeBuilder =>
             {
-                foreach (var item in connections)
+                foreach (var Connection in this.Connections)
                 {
-                    var connectionString = item.Value;
+                    var connectionString = Connection.Value;
                     var tables = DbSchemaReader.GetSchemata(connectionString);
-
-                    //Multipl entitySet from tables
-                    //builder.EntitySet<>()
+                    foreach (var table in tables)
+                    {
+                        var tableType = modelBuilder.CreateModelType($"Huiali.ILOData.ILEmit.{Connection.Key}.Models", table);
+                        //builder.EntitySet<>()
+                        var entityType = builder.AddEntityType(tableType);
+                        builder.AddEntitySet(table.Name, entityType);
+                    }
 
                     routeBuilder.MapODataServiceRoute(
-                        $"ODATAROUTE_{item.Key}",
-                        item.Key,
+                        $"ODATAROUTE_{Connection.Key}",
+                        Connection.Key,
                         builder.GetEdmModel());
                 }
                 routeBuilder

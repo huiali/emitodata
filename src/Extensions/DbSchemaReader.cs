@@ -27,7 +27,7 @@ namespace Huiali.ILOData.Extensions
             using (SqlConnection connection = new SqlConnection(connectionString))
             {
                 connection.Open();
-                var command = new SqlCommand(sql,connection);
+                var command = new SqlCommand(sql, connection);
                 List<Column> columns = new List<Column>();
                 using (var reader = command.ExecuteReader())
                 {
@@ -38,7 +38,7 @@ namespace Huiali.ILOData.Extensions
                             SchemaName = reader[0].ToString(),
                             TableName = reader[1].ToString(),
                             ColumnName = reader[2].ToString(),
-                            ColumnType = reader[3].ToString(),
+                            ColumnType = TypeConvert.GetRuntimeType(reader[3].ToString(), Convert.ToBoolean(reader[5].ToString())),
                             IsPrimaryKey = Convert.ToBoolean(reader[4]),
                             IsNullable = Convert.ToBoolean(reader[5].ToString()),
                             IsIdentity = Convert.ToBoolean(reader[6].ToString()),
