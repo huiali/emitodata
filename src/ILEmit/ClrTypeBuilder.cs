@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 using System.Reflection;
 using System.Reflection.Emit;
 using Huiali.ILOData.Models;
@@ -13,19 +14,19 @@ namespace Huiali.ILOData.ILEmit
         {
             TypeBuilder typeBuilder = modelBuilder.DefineType(namespaceName + "." + table.Name, TypeAttributes.Public);
             // int i = 1;
-            foreach (Column columnItme in table.Columns)
+            foreach (Column columnItem in table.Columns)
             {
-                Type filedtype = columnItme.ColumnType;
-                FieldBuilder fieldBldr = typeBuilder.DefineField("_" + columnItme.ColumnName.ToLower(),
+                Type filedtype = columnItem.ColumnType;
+                FieldBuilder fieldBldr = typeBuilder.DefineField("_" + columnItem.ColumnName.ToLower(),
                     filedtype,
                     FieldAttributes.Private);
-                PropertyBuilder propBldr = typeBuilder.DefineProperty(columnItme.ColumnName,
+                PropertyBuilder propBldr = typeBuilder.DefineProperty(columnItem.ColumnName,
                     PropertyAttributes.HasDefault,
                     filedtype,
                     null);
                 const MethodAttributes getSetAttr = MethodAttributes.Public | MethodAttributes.SpecialName |
                                                     MethodAttributes.HideBySig;
-                MethodBuilder getPropMthdBldr = typeBuilder.DefineMethod("get_" + columnItme.ColumnName,
+                MethodBuilder getPropMthdBldr = typeBuilder.DefineMethod("get_" + columnItem.ColumnName,
                     getSetAttr,
                     filedtype,
                     Type.EmptyTypes);
@@ -33,7 +34,7 @@ namespace Huiali.ILOData.ILEmit
                 getIlGenerator.Emit(OpCodes.Ldarg_0);
                 getIlGenerator.Emit(OpCodes.Ldfld, fieldBldr);
                 getIlGenerator.Emit(OpCodes.Ret);
-                MethodBuilder setPropMthdBldr = typeBuilder.DefineMethod("set_" + columnItme.ColumnName,
+                MethodBuilder setPropMthdBldr = typeBuilder.DefineMethod("set_" + columnItem.ColumnName,
                     getSetAttr,
                     null,
                     new[] { filedtype });
@@ -44,12 +45,37 @@ namespace Huiali.ILOData.ILEmit
                 setIlGenerator.Emit(OpCodes.Ret);
                 propBldr.SetGetMethod(getPropMthdBldr);
                 propBldr.SetSetMethod(setPropMthdBldr);
+
+                if (columnItem.IsPrimaryKey)
+                {
+                    ConstructorInfo classCtorInfo = typeof(KeyAttribute).GetConstructor(new Type[0]);
+                    CustomAttributeBuilder keyAttribute = new CustomAttributeBuilder(
+                        classCtorInfo,
+                        new object[0]);
+                    propBldr.SetCustomAttribute(keyAttribute);
+                }
+                if (columnItem.MaxLength != -1)
+                {
+                    ConstructorInfo classCtorInfo = typeof(MaxLengthAttribute).GetConstructor(new Type[] { typeof(int) });
+                    CustomAttributeBuilder maxLengthAttribute = new CustomAttributeBuilder(
+                        classCtorInfo,
+                        new object[] { columnItem.MaxLength });
+                    propBldr.SetCustomAttribute(maxLengthAttribute);
+                }
+                if (!columnItem.IsNullable)
+                {
+                    ConstructorInfo classCtorInfo = typeof(RequiredAttribute).GetConstructor(new Type[] { });
+                    CustomAttributeBuilder requiredAttribute = new CustomAttributeBuilder(
+                        classCtorInfo,
+                        new object[] {  });
+                    propBldr.SetCustomAttribute(requiredAttribute);
+                }
             }
             Type modeltype = typeBuilder.CreateType();
             return modeltype;
         }
 
-        public static Type CreateDbContext(this ModuleBuilder modelBuilder, string typeName, List<Type> types, string connectionString)
+        public static Type CreateDbContext(this ModuleBuilder modelBuilder, string typeName, List<Type> types)
         {
             var dbContexttype = typeof(DbContext);
             Type listOf = typeof(DbSet<>);
@@ -100,19 +126,18 @@ namespace Huiali.ILOData.ILEmit
                 propBldr.SetSetMethod(setPropMthdBldr);
             }
 
-            Type[] parameterTypes = { };
+            Type toptionType = typeof(DbContextOptions<>);
+            Type optionType = toptionType.MakeGenericType(typeBuilder);
             ConstructorBuilder ctor1 = typeBuilder.DefineConstructor(
                 MethodAttributes.Public,
-                CallingConventions.Standard, parameterTypes);
+                CallingConventions.Standard, new[] { optionType });
 
             ILGenerator ctor0Il = ctor1.GetILGenerator();
-
-            ConstructorInfo method = dbContexttype.GetConstructor(new[] { typeof(string) });
+            ConstructorInfo method = dbContexttype.GetConstructor(new[] { typeof(DbContextOptions) });
 
             ctor0Il.Emit(OpCodes.Ldarg_0);
-            ctor0Il.Emit(OpCodes.Ldstr, connectionString);
+            ctor0Il.Emit(OpCodes.Ldarg_1);
             ctor0Il.Emit(OpCodes.Call, method);
-            ctor0Il.Emit(OpCodes.Nop);
             ctor0Il.Emit(OpCodes.Nop);
             ctor0Il.Emit(OpCodes.Nop);
             ctor0Il.Emit(OpCodes.Ret);

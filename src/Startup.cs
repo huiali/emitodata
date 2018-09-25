@@ -68,7 +68,9 @@ namespace Huiali.ILOData
                         builder.AddEntitySet(table.Name, entityType);
                     }
 
-                    var dbcontextType = modelBuilder.CreateDbContext($"{assemblyName}.{Connection.Key}.Models.{Connection.Key}Context", modelTypes, connectionString);
+                    var dbcontextType = modelBuilder.CreateDbContext($"{assemblyName}.{Connection.Key}.Models.{Connection.Key}Context", modelTypes);
+
+                    
                     routeBuilder.MapODataServiceRoute(
                         $"ODATAROUTE_{Connection.Key}",
                         Connection.Key,
