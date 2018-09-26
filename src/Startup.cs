@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
+using System.Threading;
 using System.Threading.Tasks;
 using Huiali.ILOData.Extensions;
 using Huiali.ILOData.ILEmit;
@@ -36,21 +37,29 @@ namespace Huiali.ILOData
         {
             services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_2_1);
             services.AddOData();
-
             foreach (var item in this.Connections)
             {
                 //services.AddDbContext<>(options => options.UseSqlServer(item.Value))
             }
+            
         }
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
-        public void Configure(IApplicationBuilder app, IHostingEnvironment env)
+        public void Configure(IApplicationBuilder app, IHostingEnvironment env,IServiceCollection services)
         {
             ODataConventionModelBuilder builder = new ODataConventionModelBuilder(app.ApplicationServices);
 
-            var assemblyName = "Huiali.ILOData.ILEmit";
-            var modelName = new AssemblyName(assemblyName);
-            var dynamicModelAssembly = AssemblyBuilder.DefineDynamicAssembly(modelName, AssemblyBuilderAccess.RunAndCollect);
-            var modelBuilder = dynamicModelAssembly.DefineDynamicModule(modelName.Name);
+            string assemblyName = "Huiali.ILOData.ILEmit";
+            AssemblyName modelName = new AssemblyName(assemblyName);
+            AssemblyBuilder assemblyBuilder = AssemblyBuilder.DefineDynamicAssembly(modelName, AssemblyBuilderAccess.RunAndCollect);
+            ModuleBuilder modelBuilder = assemblyBuilder.DefineDynamicModule(modelName.Name);
+
+            // AssemblyName aName = new AssemblyName("DynamicAssemblyExample");
+            //         AssemblyBuilder ab = 
+            //             AppDomain.CurrentDomain.DefineDynamicAssembly(
+            //                 aName, 
+            //                 AssemblyBuilderAccess.RunAndSave);
+
+
 
             Action<IRouteBuilder> configureRoutes = routeBuilder =>
             {
@@ -58,7 +67,7 @@ namespace Huiali.ILOData
                 {
                     var connectionString = Connection.Value;
                     var tables = DbSchemaReader.GetSchemata(connectionString);
-                    List<Type> modelTypes=new List<Type>();
+                    List<Type> modelTypes = new List<Type>();
                     foreach (var table in tables)
                     {
                         var modelType = modelBuilder.CreateModelType($"{assemblyName}.{Connection.Key}.Models", table);
@@ -70,7 +79,14 @@ namespace Huiali.ILOData
 
                     var dbcontextType = modelBuilder.CreateDbContext($"{assemblyName}.{Connection.Key}.Models.{Connection.Key}Context", modelTypes);
 
-                    
+                    foreach (var itemType in modelTypes)
+                    {
+                        var controllerType = modelBuilder.CreateControllerType(
+                            $"{assemblyName}.{Connection.Key}.Controllers.{itemType.Name}Controller",
+                             itemType,
+                             dbcontextType);
+                    }
+
                     routeBuilder.MapODataServiceRoute(
                         $"ODATAROUTE_{Connection.Key}",
                         Connection.Key,
