@@ -37,21 +37,25 @@ namespace Huiali.ILOData
         {
             services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_2_1);
             services.AddOData();
-            foreach (var item in this.Connections)
-            {
-                //services.AddDbContext<>(options => options.UseSqlServer(item.Value))
-            }
-            
+            services.AddTransient<EdmModelBuilder>();
+            // foreach (var item in this.Connections)
+            // {
+            //     //services.AddDbContext<>(options => options.UseSqlServer(item.Value))
+            //     Action<DbContextOptionsBuilder> optionsAction = options => options.UseSqlServer(item.Value);
+            //     MethodInfo addDbContextmethod = services
+            //     .GetType()
+            //     .GetMethod("AddDbContext")
+            //     .MakeGenericMethod(new Type[] { });
+
+            //     addDbContextmethod.Invoke(null, new object[] { optionsAction });
+            // }
+
         }
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
-        public void Configure(IApplicationBuilder app, IHostingEnvironment env,IServiceCollection services)
+        public void Configure(IApplicationBuilder app, IHostingEnvironment env, EdmModelBuilder eb)
         {
             ODataConventionModelBuilder builder = new ODataConventionModelBuilder(app.ApplicationServices);
-
-            string assemblyName = "Huiali.ILOData.ILEmit";
-            AssemblyName modelName = new AssemblyName(assemblyName);
-            AssemblyBuilder assemblyBuilder = AssemblyBuilder.DefineDynamicAssembly(modelName, AssemblyBuilderAccess.RunAndCollect);
-            ModuleBuilder modelBuilder = assemblyBuilder.DefineDynamicModule(modelName.Name);
+            ModuleBuilder moduleBuilder = ClrTypeBuilder.GetModuleBuilder();
 
             // AssemblyName aName = new AssemblyName("DynamicAssemblyExample");
             //         AssemblyBuilder ab = 
@@ -65,32 +69,18 @@ namespace Huiali.ILOData
             {
                 foreach (var Connection in this.Connections)
                 {
-                    var connectionString = Connection.Value;
-                    var tables = DbSchemaReader.GetSchemata(connectionString);
-                    List<Type> modelTypes = new List<Type>();
-                    foreach (var table in tables)
-                    {
-                        var modelType = modelBuilder.CreateModelType($"{assemblyName}.{Connection.Key}.Models", table);
-                        modelTypes.Add(modelType);
-                        //builder.EntitySet<>()
-                        var entityType = builder.AddEntityType(modelType);
-                        builder.AddEntitySet(table.Name, entityType);
-                    }
-
-                    var dbcontextType = modelBuilder.CreateDbContext($"{assemblyName}.{Connection.Key}.Models.{Connection.Key}Context", modelTypes);
-
-                    foreach (var itemType in modelTypes)
-                    {
-                        var controllerType = modelBuilder.CreateControllerType(
-                            $"{assemblyName}.{Connection.Key}.Controllers.{itemType.Name}Controller",
-                             itemType,
-                             dbcontextType);
-                    }
-
-                    routeBuilder.MapODataServiceRoute(
-                        $"ODATAROUTE_{Connection.Key}",
-                        Connection.Key,
-                        builder.GetEdmModel());
+                    var edmModel = eb.GetEdmModel(Connection, app.ApplicationServices, moduleBuilder);
+                    routeBuilder.MapODataServiceRoute($"ODATAROUTE_{Connection.Key}", Connection.Key, edmModel);
+                    
+                    
+                    // var dbcontextType = moduleBuilder.CreateDbContext($"{moduleBuilder.Name}.{Connection.Key}.Models.{Connection.Key}Context", modelTypes);
+                    // foreach (var itemType in modelTypes)
+                    // {
+                    //     var controllerType = modelBuilder.CreateControllerType(
+                    //         $"{assemblyName}.{Connection.Key}.Controllers.{itemType.Name}Controller",
+                    //          itemType,
+                    //          dbcontextType);
+                    // }
                 }
 
                 routeBuilder

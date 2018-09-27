@@ -150,7 +150,7 @@ namespace Huiali.ILOData.ILEmit
         internal static Type CreateControllerType(this ModuleBuilder modelBuilder, string controllerName, Type modeltype,
             Type contextType)
         {
-        
+
             TypeBuilder typeBuilder = modelBuilder.DefineType(controllerName, TypeAttributes.Public, typeof(ODataController));
             ConstructorInfo classCtorInfo = typeof(ProducesAttribute).GetConstructor(new Type[] { typeof(string), typeof(string[]) });
             CustomAttributeBuilder producesAttribute = new CustomAttributeBuilder(
@@ -191,6 +191,15 @@ namespace Huiali.ILOData.ILEmit
             iLGenerator.Emit(OpCodes.Ret);
 
             return typeBuilder.CreateType();
+        }
+
+        internal static ModuleBuilder GetModuleBuilder()
+        {
+            string name = "Huiali.ILOData.DynamicAssembly";
+            AssemblyName assemblyName = new AssemblyName(name);
+            AssemblyBuilder assemblyBuilder = AssemblyBuilder.DefineDynamicAssembly(assemblyName, AssemblyBuilderAccess.RunAndCollect);
+            ModuleBuilder modelBuilder = assemblyBuilder.DefineDynamicModule(name);
+            return modelBuilder;
         }
 
     }
