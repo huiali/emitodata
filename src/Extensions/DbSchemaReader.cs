@@ -1,10 +1,10 @@
 using System;
-using System.Collections.Generic;
-using System.Data.SqlClient;
 using System.Linq;
-using Huiali.ILOData.Models;
+using System.Data.SqlClient;
+using System.Collections.Generic;
+using Huiali.EmitOData.Models;
 
-namespace Huiali.ILOData.Extensions
+namespace Huiali.EmitOData.Extensions
 {
     public class DbSchemaReader
     {
@@ -38,7 +38,7 @@ namespace Huiali.ILOData.Extensions
                             SchemaName = reader[0].ToString(),
                             TableName = reader[1].ToString(),
                             ColumnName = reader[2].ToString(),
-                            ColumnType = TypeConvert.GetRuntimeType(reader[3].ToString(), Convert.ToBoolean(reader[5].ToString())),
+                            ColumnType = ClrTypeConvert.GetRuntimeType(reader[3].ToString(), Convert.ToBoolean(reader[5].ToString())),
                             IsPrimaryKey = Convert.ToBoolean(reader[4]),
                             IsNullable = Convert.ToBoolean(reader[5].ToString()),
                             IsIdentity = Convert.ToBoolean(reader[6].ToString()),

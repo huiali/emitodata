@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace Huiali.ILOData.Models
+namespace Huiali.EmitOData.Models
 {
     public class Table
     {

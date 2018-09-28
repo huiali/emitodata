@@ -1,6 +1,6 @@
 using System;
 
-namespace Huiali.ILOData.Models
+namespace Huiali.EmitOData.Models
 {
     public class Column
     {

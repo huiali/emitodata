@@ -1,8 +1,8 @@
 using System;
 
-namespace Huiali.ILOData.Extensions
+namespace Huiali.EmitOData.Extensions
 {
-    public class TypeConvert
+    public class ClrTypeConvert
     {
         public static Type GetRuntimeType(string dataType, bool isNullable)
         {
@@ -38,7 +38,7 @@ namespace Huiali.ILOData.Extensions
                 case "varchar":
                 case "xml":
                     return typeof(string);
-                case "data":
+                case "date":
                 case "datetime":
                 case "datetime2":
                 case "smalldatetime":

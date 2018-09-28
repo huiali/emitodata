@@ -1,86 +1,85 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
-using System.Threading;
-using System.Threading.Tasks;
-using Huiali.ILOData.Extensions;
-using Huiali.ILOData.ILEmit;
-using Huiali.ILOData.Models;
-using Microsoft.AspNet.OData.Builder;
-using Microsoft.AspNet.OData.Extensions;
+using System.Collections.Generic;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.HttpsPolicy;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.AspNet.OData.Builder;
+using Microsoft.AspNet.OData.Extensions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
+using Huiali.EmitOData.Extensions;
+using Huiali.EmitOData.Emit;
 
 namespace Huiali.ILOData
 {
     public class Startup
     {
-        public IConfiguration Configuration { get; }
-        private IEnumerable<IConfigurationSection> Connections;
+        private IEnumerable<IConfigurationSection> Connections { get; }
+        private Dictionary<string, List<Type>> _modelTypes = new Dictionary<string, List<Type>>();
         public Startup(IConfiguration configuration)
         {
-            Configuration = configuration;
-            this.Connections = this.Configuration.GetSection("ConnectionStrings").GetChildren();
+            this.Connections = configuration.GetSection("ConnectionStrings").GetChildren();
         }
-        // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
-            services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_2_1);
-            services.AddOData();
-            services.AddTransient<EdmModelBuilder>();
-            // foreach (var item in this.Connections)
-            // {
-            //     //services.AddDbContext<>(options => options.UseSqlServer(item.Value))
-            //     Action<DbContextOptionsBuilder> optionsAction = options => options.UseSqlServer(item.Value);
-            //     MethodInfo addDbContextmethod = services
-            //     .GetType()
-            //     .GetMethod("AddDbContext")
-            //     .MakeGenericMethod(new Type[] { });
-
-            //     addDbContextmethod.Invoke(null, new object[] { optionsAction });
-            // }
-
-        }
-        // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
-        public void Configure(IApplicationBuilder app, IHostingEnvironment env, EdmModelBuilder eb)
-        {
-            ODataConventionModelBuilder builder = new ODataConventionModelBuilder(app.ApplicationServices);
             ModuleBuilder moduleBuilder = ClrTypeBuilder.GetModuleBuilder();
+            List<Type> connectionTypes = new List<Type>();
+            foreach (var connection in this.Connections)
+            {
+                var connectionString = connection.Value;
+                var tables = DbSchemaReader.GetSchemata(connectionString);
+                List<Type> modelTypes = new List<Type>();
+                foreach (var table in tables)
+                {
+                    var modelType = moduleBuilder.CreateModelType(connection.Key, table);
+                    modelTypes.Add(modelType);
+                }
+                _modelTypes.Add(connection.Key, modelTypes);
+                var dbcontextType = moduleBuilder.CreateDbContextType(connection.Key, modelTypes);
+                Action<DbContextOptionsBuilder> optionsAction = options => options.UseSqlServer(connection.Value);
+                MethodInfo addDbContextmethod =
+                    typeof(EntityFrameworkServiceCollectionExtensions).
+                        GetMethods(BindingFlags.Public | BindingFlags.Static).
+                        FirstOrDefault(mi => mi.Name == "AddDbContext" && mi.GetGenericArguments().Count() == 1).
+                        MakeGenericMethod(new Type[] { dbcontextType });
+                addDbContextmethod.Invoke(null, new object[] { services, optionsAction, ServiceLifetime.Scoped, ServiceLifetime.Scoped });
+                foreach (var itemType in modelTypes)
+                {
+                    var controllerType = moduleBuilder.CreateControllerType(
+                        connection.Key,
+                        itemType,
+                        dbcontextType);
 
-            // AssemblyName aName = new AssemblyName("DynamicAssemblyExample");
-            //         AssemblyBuilder ab = 
-            //             AppDomain.CurrentDomain.DefineDynamicAssembly(
-            //                 aName, 
-            //                 AssemblyBuilderAccess.RunAndSave);
+                    connectionTypes.Add(controllerType);
+                }
 
-
-
+                services.AddMvc().
+                SetCompatibilityVersion(CompatibilityVersion.Version_2_1).
+                ConfigureApplicationPartManager(p => p.FeatureProviders.Add(new EmitTypeControllerFeatureProvider(connectionTypes)));
+                services.AddOData();
+            }
+        }
+        public void Configure(IApplicationBuilder app, IHostingEnvironment env)
+        {
             Action<IRouteBuilder> configureRoutes = routeBuilder =>
             {
                 foreach (var Connection in this.Connections)
                 {
-                    var edmModel = eb.GetEdmModel(Connection, app.ApplicationServices, moduleBuilder);
+                    ODataConventionModelBuilder builder = new ODataConventionModelBuilder(app.ApplicationServices);
+                    var models = _modelTypes[Connection.Key];
+
+                    foreach (Type modelType in models)
+                    {
+                        var entityType = builder.AddEntityType(modelType);
+                        builder.AddEntitySet(modelType.Name, entityType);
+                    }
+                    var edmModel = builder.GetEdmModel();
                     routeBuilder.MapODataServiceRoute($"ODATAROUTE_{Connection.Key}", Connection.Key, edmModel);
-                    
-                    
-                    // var dbcontextType = moduleBuilder.CreateDbContext($"{moduleBuilder.Name}.{Connection.Key}.Models.{Connection.Key}Context", modelTypes);
-                    // foreach (var itemType in modelTypes)
-                    // {
-                    //     var controllerType = modelBuilder.CreateControllerType(
-                    //         $"{assemblyName}.{Connection.Key}.Controllers.{itemType.Name}Controller",
-                    //          itemType,
-                    //          dbcontextType);
-                    // }
                 }
 
                 routeBuilder
@@ -92,13 +91,9 @@ namespace Huiali.ILOData
                     .MaxTop(null);
                 routeBuilder.EnableDependencyInjection();
             };
-
             app.UseMvc(configureRoutes);
+            app.UseDeveloperExceptionPage();
 
-            if (env.IsDevelopment())
-            {
-                app.UseDeveloperExceptionPage();
-            }
         }
     }
 }
