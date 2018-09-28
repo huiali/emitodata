@@ -9,7 +9,7 @@
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build",
-            "program": "${workspaceFolder}/src/bin/Debug/netcoreapp2.1/Huiali.ILOData.dll",
+            "program": "${workspaceFolder}/src/bin/Debug/netcoreapp2.1/Huiali.EmitOData.dll",
             "args": [],
             "cwd": "${workspaceFolder}/src",
             "stopAtEntry": false,

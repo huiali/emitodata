@@ -7,7 +7,7 @@
             "type": "process",
             "args": [
                 "build",
-                "${workspaceFolder}/src/Huiali.ILOData.csproj"
+                "${workspaceFolder}/src/Huiali.EmitOData.csproj"
             ],
             "problemMatcher": "$msCompile"
         }
