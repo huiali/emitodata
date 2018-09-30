@@ -1,3 +1,4 @@
-## Welcome to ILOData Pages
+## Welcome to emitodata Pages
 
-Use netcore intermediate language to build data models and controllers. Dynamically loading assemblies to memory.
+Use netcore to emit metadata and intermediate language. Dynamically load models, controllers, contexts and other classes to run in memory. 
+
