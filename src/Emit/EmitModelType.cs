@@ -8,11 +8,11 @@ namespace Huiali.EmitOData.Emit
 {
     public static class EmitModelType
     {
-        public static Type CreateModelType(this ModuleBuilder modelBuilder, string connectionKey, Table table)
+        public static Type CreateModelType(this ModuleBuilder moduleBuilder, string connectionKey, Table table)
         {
-            string typeName = $"{modelBuilder.Assembly.GetName()}.{connectionKey}.Models.{table.Name}";
+            string typeName = $"{moduleBuilder.Assembly.GetName().Name}.{connectionKey}.Models.{table.Name}";
             TypeAttributes modelTypeAttr = TypeAttributes.Public | TypeAttributes.AutoClass | TypeAttributes.AnsiClass | TypeAttributes.BeforeFieldInit;
-            TypeBuilder typeBuilder = modelBuilder.DefineType(typeName, modelTypeAttr);
+            TypeBuilder typeBuilder = moduleBuilder.DefineType(typeName, modelTypeAttr);
             foreach (Column columnItem in table.Columns)
             {
                 Type filedtype = columnItem.ColumnType;

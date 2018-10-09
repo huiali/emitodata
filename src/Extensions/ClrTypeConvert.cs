@@ -29,7 +29,8 @@ namespace Huiali.EmitOData.Extensions
                 case "sql_variant":
                     return typeof(object);
                 case "tinyint":
-                    return isNullable ? typeof(byte?) : typeof(byte);
+                    return typeof(Int32);
+                    //return isNullable ? typeof(byte?) : typeof(byte);
                 case "char":
                 case "nchar":
                 case "ntext":
@@ -54,7 +55,7 @@ namespace Huiali.EmitOData.Extensions
                 case "image":
                     return typeof(byte[]);
                 default:
-                    return typeof(object);
+                    return typeof(string);
             }
         }
     }

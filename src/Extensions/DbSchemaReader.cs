@@ -53,9 +53,10 @@ namespace Huiali.EmitOData.Extensions
         public static IEnumerable<Table> GetSchemata(string connectionString)
         {
             var columns = GetColumns(connectionString);
-            var tables = columns.GroupBy(p => p.TableName).Select(t => new Table
+            var tables = columns.GroupBy(p => $"{p.SchemaName}`{p.TableName}").Select(t => new Table
             {
-                Name = t.Key,
+                Schema = t.Key.Split('`')[0],
+                Name = t.Key.Split('`')[1],
                 Columns = t.AsEnumerable()
             });
             return tables;

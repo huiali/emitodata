@@ -14,13 +14,15 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Huiali.EmitOData.Extensions;
 using Huiali.EmitOData.Emit;
+using Huiali.EmitOData.Models;
+using Microsoft.Extensions.Logging;
 
 namespace Huiali.ILOData
 {
     public class Startup
     {
         private IEnumerable<IConfigurationSection> Connections { get; }
-        private Dictionary<string, List<Type>> _modelTypes = new Dictionary<string, List<Type>>();
+        private Dictionary<string, List<Entry>> _entrys = new Dictionary<string, List<Entry>>();
         public Startup(IConfiguration configuration)
         {
             this.Connections = configuration.GetSection("ConnectionStrings").GetChildren();
@@ -33,14 +35,14 @@ namespace Huiali.ILOData
             {
                 var connectionString = connection.Value;
                 var tables = DbSchemaReader.GetSchemata(connectionString);
-                List<Type> modelTypes = new List<Type>();
+                List<Entry> entrys = new List<Entry>();
                 foreach (var table in tables)
                 {
                     var modelType = moduleBuilder.CreateModelType(connection.Key, table);
-                    modelTypes.Add(modelType);
+                    entrys.Add(new Entry(modelType, table));
                 }
-                _modelTypes.Add(connection.Key, modelTypes);
-                var dbcontextType = moduleBuilder.CreateDbContextType(connection.Key, modelTypes);
+                _entrys.Add(connection.Key, entrys);
+                var dbcontextType = moduleBuilder.CreateDbContextType(connection.Key, entrys);
                 Action<DbContextOptionsBuilder> optionsAction = options => options.UseSqlServer(connection.Value);
                 MethodInfo addDbContextmethod =
                     typeof(EntityFrameworkServiceCollectionExtensions).
@@ -48,35 +50,37 @@ namespace Huiali.ILOData
                         FirstOrDefault(mi => mi.Name == "AddDbContext" && mi.GetGenericArguments().Count() == 1).
                         MakeGenericMethod(new Type[] { dbcontextType });
                 addDbContextmethod.Invoke(null, new object[] { services, optionsAction, ServiceLifetime.Scoped, ServiceLifetime.Scoped });
-                foreach (var itemType in modelTypes)
+                foreach (var entry in entrys)
                 {
                     var controllerType = moduleBuilder.CreateControllerType(
                         connection.Key,
-                        itemType,
+                        entry.Type,
                         dbcontextType);
 
                     connectionTypes.Add(controllerType);
                 }
+            }
 
-                services.AddMvc().
+            services.AddMvc().
                 SetCompatibilityVersion(CompatibilityVersion.Version_2_1).
                 ConfigureApplicationPartManager(p => p.FeatureProviders.Add(new EmitTypeControllerFeatureProvider(connectionTypes)));
-                services.AddOData();
-            }
+            services.AddOData();
         }
-        public void Configure(IApplicationBuilder app, IHostingEnvironment env)
+        public void Configure(IApplicationBuilder app, IHostingEnvironment env, ILoggerFactory loggerFactory)
         {
+            loggerFactory.AddConsole();
+            loggerFactory.AddDebug();
             Action<IRouteBuilder> configureRoutes = routeBuilder =>
             {
                 foreach (var Connection in this.Connections)
                 {
                     ODataConventionModelBuilder builder = new ODataConventionModelBuilder(app.ApplicationServices);
-                    var models = _modelTypes[Connection.Key];
+                    var entrys = _entrys[Connection.Key];
 
-                    foreach (Type modelType in models)
+                    foreach (Entry entry in entrys)
                     {
-                        var entityType = builder.AddEntityType(modelType);
-                        builder.AddEntitySet(modelType.Name, entityType);
+                        var entityType = builder.AddEntityType(entry.Type);
+                        var entirySet=builder.AddEntitySet(entry.Type.Name, entityType);
                     }
                     var edmModel = builder.GetEdmModel();
                     routeBuilder.MapODataServiceRoute($"ODATAROUTE_{Connection.Key}", Connection.Key, edmModel);
