@@ -10,20 +10,41 @@ namespace Huiali.EmitOData.Extensions
     {
         private static IEnumerable<Column> GetColumns(string connectionString)
         {
-            const string sql = @"
-            select 
-                SchemaName = schema_name(t.schema_id),
-	            TableName = t.name,
-	            ColumnName = c.name,
-                ColumnType = TYPE_NAME(c.system_type_id),
-	            IsPrimaryKey = (select count(*) from
+            const string sql = @"SELECT
+    SCHEMA_NAME([t].[schema_id]) AS [SchemaName],
+    [t].[name] AS [TableName],
+    [c].[name] AS [ColumnName],
+    [tp].[name] AS [ColumnType],
+	(select count(*) from
                         sys.indexes as i join sys.index_columns as ic on i.OBJECT_ID = ic.OBJECT_ID and i.index_id = ic.index_id and ic.column_id = c.column_id
-                        where i.is_primary_key = 1 and i.object_id = t.object_id),
-                IsNullable= c.is_nullable,
-                IsIdentity= c.is_identity,
-                MaxLength = c.max_length
-            from sys.tables t join sys.columns c on t.object_id = c.object_id
-            order by t.name , c.column_id";
+                        where i.is_primary_key = 1 and i.object_id = t.object_id) as IsPrimaryKey,
+	[c].[is_nullable] AS [IsNullable],
+	[c].[is_identity] AS [IsIdentity],
+	CAST([c].[max_length] AS int) AS [MaxLength],
+    [c].[column_id] AS [ordinal],
+    SCHEMA_NAME([tp].[schema_id]) AS [type_schema],
+    CAST([c].[precision] AS int) AS [precision],
+    CAST([c].[scale] AS int) AS [scale],
+    
+    OBJECT_DEFINITION([c].[default_object_id]) AS [default_sql],
+    [cc].[definition] AS [computed_sql]
+	
+FROM [sys].[columns] AS [c]
+JOIN [sys].[tables] AS [t] ON [c].[object_id] = [t].[object_id]
+JOIN [sys].[types] AS [tp] ON [c].[user_type_id] = [tp].[user_type_id]
+LEFT JOIN [sys].[computed_columns] AS [cc] ON [c].[object_id] = [cc].[object_id] AND [c].[column_id] = [cc].[column_id]
+WHERE [t].[is_ms_shipped] = 0
+AND NOT EXISTS (SELECT *
+    FROM [sys].[extended_properties] AS [ep]
+    WHERE [ep].[major_id] = [t].[object_id]
+        AND [ep].[minor_id] = 0
+        AND [ep].[class] = 1
+        AND [ep].[name] = N'microsoft_database_tools_support'
+    )
+AND [t].[name] <> '__EFMigrationsHistory'
+AND [t].[temporal_type] <> 1 AND [c].[is_hidden] = 0
+ORDER BY [SchemaName], [TableName], [c].[column_id]";
+
             using (SqlConnection connection = new SqlConnection(connectionString))
             {
                 connection.Open();
