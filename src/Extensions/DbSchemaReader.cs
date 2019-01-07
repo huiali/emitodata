@@ -25,10 +25,8 @@ namespace Huiali.EmitOData.Extensions
     SCHEMA_NAME([tp].[schema_id]) AS [type_schema],
     CAST([c].[precision] AS int) AS [precision],
     CAST([c].[scale] AS int) AS [scale],
-    
     OBJECT_DEFINITION([c].[default_object_id]) AS [default_sql],
     [cc].[definition] AS [computed_sql]
-	
 FROM [sys].[columns] AS [c]
 JOIN [sys].[tables] AS [t] ON [c].[object_id] = [t].[object_id]
 JOIN [sys].[types] AS [tp] ON [c].[user_type_id] = [tp].[user_type_id]

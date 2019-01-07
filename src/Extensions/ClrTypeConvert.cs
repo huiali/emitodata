@@ -30,7 +30,6 @@ namespace Huiali.EmitOData.Extensions
                     return typeof(object);
                 case "tinyint":
                     return typeof(Int32);
-                    //return isNullable ? typeof(byte?) : typeof(byte);
                 case "char":
                 case "nchar":
                 case "ntext":
